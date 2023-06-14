@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "t04"
+version = "0.1.0"
+description = "Código Fonte do Trabalho 4 de processamento digital de imagens (MC920)"
+authors = ["Jhonatan Cléto"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+numpy = "^1.24.3"
+scikit-image = "^0.21.0"
+typer = {extras = ["all"], version = "^0.9.0"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.3.2"
+blue = "^0.9.1"
+isort = "^5.12.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
