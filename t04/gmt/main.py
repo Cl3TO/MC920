@@ -5,6 +5,7 @@ from rich import print
 from skimage import io, transform
 from typer import Option, run
 
+from gmt import gmt_coords, gmt_warp
 
 def open_image(path: Path):
     """Abre uma imagem monocromática e retorna uma matriz numpy.
@@ -34,15 +35,28 @@ def gmt_rotate(image: np.ndarray, angle: float):
     """
     Rotaciona uma imagem no sentido anti-horário.
     """
-    image_rotated = transform.rotate(
-        image,
-        angle,
-        resize=True,
-        center=None,
-        order=3,
-        mode='constant',
-        cval=1,
+    # image_rotated = transform.rotate(
+    #     image,
+    #     angle,
+    #     resize=True,
+    #     center=None,
+    #     order=3,
+    #     mode='constant',
+    #     cval=1,
+    # )
+
+    # Convert the angle to radians
+    angle = np.deg2rad(angle)
+
+    R = np.array(
+        [
+            [np.cos(angle), -np.sin(angle), 0],
+            [np.sin(angle), np.cos(angle), 0],
+            [0, 0, 1],
+        ]
     )
+
+    image_rotated = gmt_warp(image, R.T, inverse=True)
     return image_rotated
 
 
@@ -50,9 +64,20 @@ def gmt_scale(image: np.ndarray, scale: float):
     """
     Aplica uma escala em uma imagem.
     """
-    image_scaled = transform.rescale(
-        image, scale, order=3, mode='constant', cval=1, anti_aliasing=False
+    # image_scaled = transform.rescale(
+    #     image, scale, order=3, mode='constant', cval=1, anti_aliasing=False
+    # )
+
+    S = np.array(
+        [
+            [scale, 0, 0],
+            [0, scale, 0],
+            [0, 0, 1],
+        ]
     )
+
+    S_inv = np.linalg.inv(S)
+    image_scaled = gmt_warp(image, S_inv, inverse=True)
     return image_scaled
 
 
@@ -60,15 +85,33 @@ def gmt_resize(image: np.ndarray, output_shape: tuple[int, int]):
     """
     Redimensiona uma imagem.
     """
-    image_resized = transform.resize(
-        image,
-        output_shape,
-        order=3,
-        mode='constant',
-        cval=1,
-        clip=True,
-        anti_aliasing=False,
+    # image_resized = transform.resize(
+    #     image,
+    #     output_shape,
+    #     order=3,
+    #     mode='constant',
+    #     cval=1,
+    #     clip=True,
+    #     anti_aliasing=False,
+    # )
+
+
+    # Get the scale factors
+    rows, cols = image.shape
+    rows_out, cols_out = output_shape
+    sx, sy = cols_out / cols, rows_out / rows
+
+    # Get the transformation matrix
+    A = np.array(
+        [
+            [sx, 0, 0],
+            [0, sy, 0],
+            [0, 0, 1],
+        ]
     )
+
+    A_inv = np.linalg.inv(A)
+    image_resized = gmt_warp(image, A_inv, inverse=True)
     return image_resized
 
 
