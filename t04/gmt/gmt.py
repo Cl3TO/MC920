@@ -5,7 +5,7 @@ from numpy.linalg import solve
 
 
 def gmt_coords(
-        rows:int, cols:int, gmt: np.ndarray
+    rows: int, cols: int, gmt: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Get the coordinates to apply a geometric transformation to an image.
 
@@ -34,19 +34,17 @@ def gmt_coords(
     t_coords = gmt @ coords
 
     # Normalize the coordinates
-    t_coords = (t_coords[:2] / t_coords[2])
+    t_coords = t_coords[:2] / t_coords[2]
 
     # Return the coordinates of the pixels (x, y)
     return coords[:2], t_coords
 
 
 def gmt_nearest_neighbor_interpolation(
-    image: np.ndarray,
-    coords: np.ndarray,
-    shape: Tuple[int, int]
+    image: np.ndarray, coords: np.ndarray, shape: Tuple[int, int]
 ) -> np.ndarray:
     """Apply a nearest neighbor interpolation to a pixel of an image.
-    
+
     Parameters:
         image: input image
         coords: coordinates of the pixel
@@ -68,13 +66,12 @@ def gmt_nearest_neighbor_interpolation(
     image_blnr = image[y_n, x_n]
     return image_blnr.reshape(shape).astype(image.dtype)
 
+
 def gmt_bilinear_interpolation(
-    image: np.ndarray,
-    coords: np.ndarray,
-    shape: Tuple[int, int]
+    image: np.ndarray, coords: np.ndarray, shape: Tuple[int, int]
 ) -> np.ndarray:
     """Apply a bilinear interpolation to a pixel of an image.
-    
+
     Parameters:
         image: input image
         coords: coordinates of the pixel
@@ -93,39 +90,38 @@ def gmt_bilinear_interpolation(
     x_n = np.floor(x_o).astype(np.uint32)
     y_n = np.floor(y_o).astype(np.uint32)
 
-
     # Get the distances
     dx = x_o - x_n
     dy = y_o - y_n
 
     # Get the weights of the pixels
-    weights = np.array([
-        (1 - dx)*(1 - dy),
-        dx*(1 - dy),
-        (1 - dx)*dy,
-        dx*dy
-    ])
+    weights = np.array(
+        [(1 - dx) * (1 - dy), dx * (1 - dy), (1 - dx) * dy, dx * dy]
+    )
 
     # Ensure that the coordinates are inside the image
     xn_1 = np.where(x_n + 1 < cols - 1, x_n + 1, cols - 1)
     yn_1 = np.where(y_n + 1 < rows - 1, y_n + 1, rows - 1)
 
     # Get the neighborhood of the pixel
-    neighborhood = np.vstack((
-        image[y_n, x_n],
-        image[y_n, xn_1],
-        image[yn_1, x_n],
-        image[yn_1, xn_1]
-    ))
+    neighborhood = np.vstack(
+        (
+            image[y_n, x_n],
+            image[y_n, xn_1],
+            image[yn_1, x_n],
+            image[yn_1, xn_1],
+        )
+    )
 
     image_blnr = np.sum(weights * neighborhood, axis=0)
     return image_blnr.reshape(shape).astype(image.dtype)
 
+
 def gmt_bilinear_interpolation_naive(
-        image: np.ndarray, x_o: float, y_o: float
+    image: np.ndarray, x_o: float, y_o: float
 ) -> float:
     """Apply a bilinear interpolation to a pixel of an image.
-    
+
     Parameters:
         image: input image
         x_o: x coordinate of the pixel
@@ -133,7 +129,7 @@ def gmt_bilinear_interpolation_naive(
     Returns:
         pixel: interpolated pixel
     """
-    
+
     # Get the coordinates of the pixels
     rows, cols = image.shape
     x_o = np.clip(x_o, 0, cols - 1)
@@ -151,12 +147,9 @@ def gmt_bilinear_interpolation_naive(
     dy = y_o - y_i
 
     # Get the weights of the pixels
-    weights = np.array([
-        (1 - dx)*(1 - dy),
-        dx*(1 - dy),
-        (1 - dx)*dy,
-        dx*dy
-    ])
+    weights = np.array(
+        [(1 - dx) * (1 - dy), dx * (1 - dy), (1 - dx) * dy, dx * dy]
+    )
 
     # Calculate the pixel intensity
     neighbors = np.array([p1, p2, p3, p4])
@@ -165,7 +158,7 @@ def gmt_bilinear_interpolation_naive(
 
 
 def gmt_bicubic_interpolation(
-        image: np.ndarray, coords: np.ndarray, shape: np.ndarray
+    image: np.ndarray, coords: np.ndarray, shape: np.ndarray
 ) -> np.ndarray:
     """Compute bicubic interpolation using B-splines
 
@@ -178,8 +171,8 @@ def gmt_bicubic_interpolation(
     """
 
     def R(s: np.ndarray) -> np.ndarray:
-        """ R Cubic B-spline function
-        
+        """R Cubic B-spline function
+
         Params:
             s: Input array
         Returns:
@@ -187,18 +180,10 @@ def gmt_bicubic_interpolation(
         """
 
         R = (
-            np.power(
-                np.maximum(s+2, 0), 3
-            ) -
-            4 * np.power(
-                np.maximum(s+1, 0), 3
-            ) +
-            6 * np.power(
-                np.maximum(s, 0), 3
-            ) -
-            4 * np.power(
-                np.maximum(s-1, 0), 3
-            )
+            np.power(np.maximum(s + 2, 0), 3)
+            - 4 * np.power(np.maximum(s + 1, 0), 3)
+            + 6 * np.power(np.maximum(s, 0), 3)
+            - 4 * np.power(np.maximum(s - 1, 0), 3)
         ) / 6
 
         return R
@@ -217,7 +202,7 @@ def gmt_bicubic_interpolation(
 
     # Compute interpolation weights
     weights = np.array(
-        [R(m-dx) * R(n-dy) for m in range(-1, 3) for n in range(-1, 3)]
+        [R(m - dx) * R(n - dy) for m in range(-1, 3) for n in range(-1, 3)]
     )
 
     # Pad the image
@@ -225,16 +210,20 @@ def gmt_bicubic_interpolation(
 
     # Compute the interpolated pixels
     pixels = np.array(
-        [padded_image[y0+2+j, x0+2+i] for j in range(-1, 3) for i in range(-1, 3)]
+        [
+            padded_image[y0 + 2 + j, x0 + 2 + i]
+            for j in range(-1, 3)
+            for i in range(-1, 3)
+        ]
     )
 
     # Compute the output image
-    out = np.sum(weights * pixels, axis=0).reshape(shape)
+    out = np.sum(weights * pixels, axis=0).reshape(shape).astype(image.dtype)
     return out
 
 
 def gmt_lagrange_interpolation(
-        image: np.ndarray, coords: np.ndarray, shape: np.ndarray
+    image: np.ndarray, coords: np.ndarray, shape: np.ndarray
 ) -> np.ndarray:
     """Compute lagrange interpolation
 
@@ -245,7 +234,7 @@ def gmt_lagrange_interpolation(
     Returns:
         out: Output image
     """
-    
+
     # Compute the indices of the pixels
     rows, cols = image.shape
     x, y = coords
@@ -261,20 +250,20 @@ def gmt_lagrange_interpolation(
     # Compute L interpolation weights
     L_w = np.array(
         [
-            -dx*(dx-1)*(dx-2)/6,
-            (dx+1)*(dx-1)*(dx-2)/2,
-            -dx*(dx+1)*(dx-2)/2,
-            dx*(dx+1)*(dx-1)/6
+            -dx * (dx - 1) * (dx - 2) / 6,
+            (dx + 1) * (dx - 1) * (dx - 2) / 2,
+            -dx * (dx + 1) * (dx - 2) / 2,
+            dx * (dx + 1) * (dx - 1) / 6,
         ]
     )
 
     # Compute interpolation weights
     w = np.array(
         [
-            -dy*(dy-1)*(dy-2)/6,
-            (dy+1)*(dy-1)*(dy-2)/2,
-            -dy*(dy+1)*(dy-2)/2,
-            dy*(dy+1)*(dy-1)/6
+            -dy * (dy - 1) * (dy - 2) / 6,
+            (dy + 1) * (dy - 1) * (dy - 2) / 2,
+            -dy * (dy + 1) * (dy - 2) / 2,
+            dy * (dy + 1) * (dy - 1) / 6,
         ]
     )
 
@@ -283,17 +272,20 @@ def gmt_lagrange_interpolation(
 
     # Compute the interpolated pixels
     pixels = np.array(
-        [padded_image[y0+n, x0+2+i] for n in range(1, 5) for i in range(-1, 3)]
+        [
+            padded_image[y0 + n, x0 + 2 + i]
+            for n in range(1, 5)
+            for i in range(-1, 3)
+        ]
     )
 
     # Compute the Lagrange interpolation
     L = np.array(
-        [np.sum(L_w * pixels[n*4:(n+1)*4], axis=0) for n in range(4)]
+        [np.sum(L_w * pixels[n * 4 : (n + 1) * 4], axis=0) for n in range(4)]
     )
 
     # Compute the output image
-    out = np.sum(w * L, axis=0).reshape(shape)
-
+    out = np.sum(w * L, axis=0).reshape(shape).astype(image.dtype)
     return out
 
 
@@ -313,7 +305,6 @@ def gmt_warp(
     # Create the transformed image
     t_image = np.zeros_like(image)
 
-
     # get rows and cols
     rows, cols = image.shape
 
@@ -330,12 +321,12 @@ def gmt_warp(
     )
 
     if inverse:
-        t_image[coords[1][inside], coords[0][inside]] = (
-            image[t_coords[1][inside], t_coords[0][inside]]
-        )
+        t_image[coords[1][inside], coords[0][inside]] = image[
+            t_coords[1][inside], t_coords[0][inside]
+        ]
     else:
-        t_image[t_coords[1][inside], t_coords[0][inside]] = (
-            image[coords[1][inside], coords[0][inside]]
-        )
+        t_image[t_coords[1][inside], t_coords[0][inside]] = image[
+            coords[1][inside], coords[0][inside]
+        ]
 
     return t_image

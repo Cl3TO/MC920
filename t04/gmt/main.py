@@ -11,7 +11,7 @@ from gmt import (
     gmt_nearest_neighbor_interpolation,
     gmt_bilinear_interpolation,
     gmt_bicubic_interpolation,
-    gmt_lagrange_interpolation
+    gmt_lagrange_interpolation,
 )
 
 
@@ -21,7 +21,6 @@ interpolations_fucs = {
     'bicubic': gmt_bicubic_interpolation,
     'lagrange': gmt_lagrange_interpolation,
 }
-
 
 
 def open_image(path: Path):
@@ -108,15 +107,17 @@ def gmt_scale(image: np.ndarray, scale: float, i_method: str):
     col, row = image.shape
     new_row, new_col = int(row * scale), int(col * scale)
     S_inv = np.linalg.inv(S)
-    
+
     interpolate = interpolations_fucs[i_method]
-    
+
     _, t_coords = gmt_coords(new_row, new_col, S_inv)
     image_scaled = interpolate(image, t_coords, (new_row, new_col))
     return image_scaled
 
 
-def gmt_resize(image: np.ndarray, output_shape: tuple[int, int], i_method: str):
+def gmt_resize(
+    image: np.ndarray, output_shape: tuple[int, int], i_method: str
+):
     """
     Redimensiona uma imagem.
     """
@@ -129,7 +130,6 @@ def gmt_resize(image: np.ndarray, output_shape: tuple[int, int], i_method: str):
     #     clip=True,
     #     anti_aliasing=False,
     # )
-
 
     # Get the scale factors
     rows, cols = image.shape
@@ -146,9 +146,9 @@ def gmt_resize(image: np.ndarray, output_shape: tuple[int, int], i_method: str):
     )
 
     S_inv = np.linalg.inv(S)
-    
+
     interpolate = interpolations_fucs[i_method]
-    
+
     _, t_coords = gmt_coords(rows_out, cols_out, S_inv)
     image_resized = interpolate(image, t_coords, (rows_out, cols_out))
 
@@ -214,7 +214,9 @@ def gmt_cli(
         print(
             f'Redimensionando a imagem [b green]{input_file.name}[/] para {output_shape}.'
         )
-        tranformet_image = gmt_resize(open_image(input_file), output_shape, method)
+        tranformet_image = gmt_resize(
+            open_image(input_file), output_shape, method
+        )
     else:
         print('Nenhuma transformação foi aplicada.')
         return
