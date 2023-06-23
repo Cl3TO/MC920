@@ -5,7 +5,24 @@ from rich import print
 from skimage import io, transform
 from typer import Option, run
 
-from gmt import gmt_coords, gmt_warp
+from gmt import (
+    gmt_coords,
+    gmt_warp,
+    gmt_nearest_neighbor_interpolation,
+    gmt_bilinear_interpolation,
+    gmt_bicubic_interpolation,
+    gmt_lagrange_interpolation
+)
+
+
+interpolations_fucs = {
+    'nearest': gmt_nearest_neighbor_interpolation,
+    'bilinear': gmt_bilinear_interpolation,
+    'bicubic': gmt_bicubic_interpolation,
+    'lagrange': gmt_lagrange_interpolation,
+}
+
+
 
 def open_image(path: Path):
     """Abre uma imagem monocromática e retorna uma matriz numpy.
@@ -31,7 +48,7 @@ def save(image: np.ndarray, output_path: Path):
     io.imsave(output_path, image, check_contrast=False)
 
 
-def gmt_rotate(image: np.ndarray, angle: float):
+def gmt_rotate(image: np.ndarray, angle: float, i_method: str):
     """
     Rotaciona uma imagem no sentido anti-horário.
     """
@@ -56,11 +73,24 @@ def gmt_rotate(image: np.ndarray, angle: float):
         ]
     )
 
-    image_rotated = gmt_warp(image, R.T, inverse=True)
+    # Translate the image to the origin
+    h, w = image.shape
+    cx, cy = w // 2, h // 2
+    T1 = np.array([[1, 0, -cx], [0, 1, -cy], [0, 0, 1]])
+
+    M = np.linalg.inv(T1) @ R @ T1
+
+    M_inv = np.linalg.inv(M)
+
+    interpolate = interpolations_fucs[i_method]
+
+    _, t_coords = gmt_coords(*image.shape, M_inv)
+
+    image_rotated = interpolate(image, t_coords, image.shape)
     return image_rotated
 
 
-def gmt_scale(image: np.ndarray, scale: float):
+def gmt_scale(image: np.ndarray, scale: float, i_method: str):
     """
     Aplica uma escala em uma imagem.
     """
@@ -75,13 +105,18 @@ def gmt_scale(image: np.ndarray, scale: float):
             [0, 0, 1],
         ]
     )
-
+    col, row = image.shape
+    new_row, new_col = int(row * scale), int(col * scale)
     S_inv = np.linalg.inv(S)
-    image_scaled = gmt_warp(image, S_inv, inverse=True)
+    
+    interpolate = interpolations_fucs[i_method]
+    
+    _, t_coords = gmt_coords(new_row, new_col, S_inv)
+    image_scaled = interpolate(image, t_coords, (new_row, new_col))
     return image_scaled
 
 
-def gmt_resize(image: np.ndarray, output_shape: tuple[int, int]):
+def gmt_resize(image: np.ndarray, output_shape: tuple[int, int], i_method: str):
     """
     Redimensiona uma imagem.
     """
@@ -98,11 +133,11 @@ def gmt_resize(image: np.ndarray, output_shape: tuple[int, int]):
 
     # Get the scale factors
     rows, cols = image.shape
-    rows_out, cols_out = output_shape
+    cols_out, rows_out = output_shape
     sx, sy = cols_out / cols, rows_out / rows
 
     # Get the transformation matrix
-    A = np.array(
+    S = np.array(
         [
             [sx, 0, 0],
             [0, sy, 0],
@@ -110,8 +145,13 @@ def gmt_resize(image: np.ndarray, output_shape: tuple[int, int]):
         ]
     )
 
-    A_inv = np.linalg.inv(A)
-    image_resized = gmt_warp(image, A_inv, inverse=True)
+    S_inv = np.linalg.inv(S)
+    
+    interpolate = interpolations_fucs[i_method]
+    
+    _, t_coords = gmt_coords(rows_out, cols_out, S_inv)
+    image_resized = interpolate(image, t_coords, (rows_out, cols_out))
+
     return image_resized
 
 
@@ -157,23 +197,24 @@ def gmt_cli(
     Aplica transformações geométricas em imagens PNG.
     """
 
+    assert method in interpolations_fucs, f'Método {method} não suportado.'
     print(f'Usando o método [b blue]{method}[/] para interpolação.')
 
     if angle != None:
         print(
             f'Rotacionando a imagem [b green]{input_file.name}[/] em {angle}°.'
         )
-        tranformet_image = gmt_rotate(open_image(input_file), angle)
+        tranformet_image = gmt_rotate(open_image(input_file), angle, method)
     elif scale != None:
         print(
             f'Aplicando escala {scale} na imagem [b green]{input_file.name}[/].'
         )
-        tranformet_image = gmt_scale(open_image(input_file), scale)
+        tranformet_image = gmt_scale(open_image(input_file), scale, method)
     elif output_shape[0] and output_shape[1]:
         print(
             f'Redimensionando a imagem [b green]{input_file.name}[/] para {output_shape}.'
         )
-        tranformet_image = gmt_resize(open_image(input_file), output_shape)
+        tranformet_image = gmt_resize(open_image(input_file), output_shape, method)
     else:
         print('Nenhuma transformação foi aplicada.')
         return
