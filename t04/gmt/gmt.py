@@ -164,12 +164,137 @@ def gmt_bilinear_interpolation_naive(
     return pixel
 
 
-def gmt_bicubic_interpolation():
-    ...
+def gmt_bicubic_interpolation(
+        image: np.ndarray, coords: np.ndarray, shape: np.ndarray
+) -> np.ndarray:
+    """Compute bicubic interpolation using B-splines
+
+    Params:
+        image: Input image
+        coords: Coordinates of output image
+        shape: Shape of output image
+    Returns:
+        out: Output image
+    """
+
+    def R(s: np.ndarray) -> np.ndarray:
+        """ R Cubic B-spline function
+        
+        Params:
+            s: Input array
+        Returns:
+            R: R function values
+        """
+
+        R = (
+            np.power(
+                np.maximum(s+2, 0), 3
+            ) -
+            4 * np.power(
+                np.maximum(s+1, 0), 3
+            ) +
+            6 * np.power(
+                np.maximum(s, 0), 3
+            ) -
+            4 * np.power(
+                np.maximum(s-1, 0), 3
+            )
+        ) / 6
+
+        return R
+
+    # Compute the indices of the pixels
+    rows, cols = image.shape
+    x, y = coords
+    x = np.clip(x, 0, cols - 1)
+    y = np.clip(y, 0, rows - 1)
+    x0 = np.floor(x).astype(np.uint32)
+    y0 = np.floor(y).astype(np.uint32)
+
+    # Compute the fractional part of the coordinates
+    dx = x - x0
+    dy = y - y0
+
+    # Compute interpolation weights
+    weights = np.array(
+        [R(m-dx) * R(n-dy) for m in range(-1, 3) for n in range(-1, 3)]
+    )
+
+    # Pad the image
+    padded_image = np.pad(image, ((2, 2), (2, 2)), mode='constant')
+
+    # Compute the interpolated pixels
+    pixels = np.array(
+        [padded_image[y0+2+j, x0+2+i] for j in range(-1, 3) for i in range(-1, 3)]
+    )
+
+    # Compute the output image
+    out = np.sum(weights * pixels, axis=0).reshape(shape)
+    return out
 
 
-def gmt_lagrange_interpolation():
-    ...
+def gmt_lagrange_interpolation(
+        image: np.ndarray, coords: np.ndarray, shape: np.ndarray
+) -> np.ndarray:
+    """Compute lagrange interpolation
+
+    Params:
+        image: Input image
+        coords: Coordinates of output image
+        shape: Shape of output image
+    Returns:
+        out: Output image
+    """
+    
+    # Compute the indices of the pixels
+    rows, cols = image.shape
+    x, y = coords
+    x = np.clip(x, 0, cols - 1)
+    y = np.clip(y, 0, rows - 1)
+    x0 = np.floor(x).astype(np.uint32)
+    y0 = np.floor(y).astype(np.uint32)
+
+    # Compute the fractional part of the coordinates
+    dx = x - x0
+    dy = y - y0
+
+    # Compute L interpolation weights
+    L_w = np.array(
+        [
+            -dx*(dx-1)*(dx-2)/6,
+            (dx+1)*(dx-1)*(dx-2)/2,
+            -dx*(dx+1)*(dx-2)/2,
+            dx*(dx+1)*(dx-1)/6
+        ]
+    )
+
+    # Compute interpolation weights
+    w = np.array(
+        [
+            -dy*(dy-1)*(dy-2)/6,
+            (dy+1)*(dy-1)*(dy-2)/2,
+            -dy*(dy+1)*(dy-2)/2,
+            dy*(dy+1)*(dy-1)/6
+        ]
+    )
+
+    # Pad the image
+    padded_image = np.pad(image, ((2, 2), (2, 2)), mode='constant')
+
+    # Compute the interpolated pixels
+    pixels = np.array(
+        [padded_image[y0+n, x0+2+i] for n in range(1, 5) for i in range(-1, 3)]
+    )
+
+    # Compute the Lagrange interpolation
+    L = np.array(
+        [np.sum(L_w * pixels[n*4:(n+1)*4], axis=0) for n in range(4)]
+    )
+
+    # Compute the output image
+    out = np.sum(w * L, axis=0).reshape(shape)
+
+    return out
 
 
 def gmt_warp(
