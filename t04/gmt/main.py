@@ -74,18 +74,43 @@ def gmt_rotate(image: np.ndarray, angle: float, i_method: str):
 
     # Translate the image to the origin
     h, w = image.shape
-    cx, cy = w // 2, h // 2
+    cx, cy = w / 2, h / 2
     T1 = np.array([[1, 0, -cx], [0, 1, -cy], [0, 0, 1]])
+    T2 = np.array([[1, 0, cx], [0, 1, cy], [0, 0, 1]])
 
-    M = np.linalg.inv(T1) @ R @ T1
+    M = T2 @ R @ T1
+    # M = R
 
     M_inv = np.linalg.inv(M)
 
+
+    # Calcula o shape da imagem rotacionada
+    corners = np.array([[0, 0, 1], [0, h, 1], [w, 0, 1], [w, h, 1]])
+    # print(corners.T)
+    corners_rotated_homogeneous = M_inv @ corners.T
+
+    corners_rotated = corners_rotated_homogeneous[:2, :]
+    # print(corners_rotated)
+    x_min, y_min = corners_rotated.min(axis=1)
+    # print(x_min, y_min)
+    x_max, y_max = corners_rotated.max(axis=1)
+    # print(x_max, y_max)
+
+    rows_rotated, cols_rotated = int(np.ceil(y_max - y_min)), int(np.ceil(x_max - x_min))
+    # print(rows_rotated, cols_rotated)
+
+    new_shape = (rows_rotated, cols_rotated)
     interpolate = interpolations_fucs[i_method]
 
-    _, t_coords = gmt_coords(*image.shape, M_inv)
+    coords, t_coords = gmt_coords(*new_shape, M_inv)
 
-    image_rotated = interpolate(image, t_coords, image.shape)
+    pad_x = int(np.ceil((cols_rotated - w) / 2))
+    pad_y = int(np.ceil((rows_rotated - h) / 2))
+
+    padded_image = np.pad(image, ((pad_y, pad_y), (pad_x, pad_x)), mode='constant')
+
+    print(padded_image.shape)
+    image_rotated = interpolate(padded_image, t_coords, new_shape)
     return image_rotated
 
 
